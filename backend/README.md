@@ -35,3 +35,23 @@ Pruebas: persistencia, escritores simultáneos, conflictos, validación, autenti
 ## Actualizaciones 0.6.1
 
 `GET /api/v1/updates` informa del estado y `POST /api/v1/updates/check` solicita una comprobación, con autenticación y Origin exacto. El comprobador solo consulta metadatos públicos de manolin-gitlab/nexo y no envía registros del catálogo. No existe una ruta HTTP para instalar código. La aplicación muestra un comando SSH que aplica la actualización con respaldo y reversión; el procedimiento completo está en trial/README.md. Las consultas a GitHub usan caché de 15 minutos y un límite mínimo de 30 segundos para comprobaciones forzadas.
+
+
+## Entrega experimental 0.7
+
+`GET /api/v1/streaming` informa del estado o de que el motor está desactivado.
+`POST /api/v1/streaming/playlist` recibe `{"client_id":"ID"}` y devuelve una M3U
+protegida; `POST /api/v1/streaming/stop` recibe `{"session_id":"ID"}`. Ambas
+escrituras requieren administrador, Origin exacto y ausencia de mantenimiento.
+Solo el entorno SSH de prueba puede habilitar el motor en esta versión; la
+instalación normal sigue sin distribuir video. Ver trial/README.md.
+
+Las rutas `/tv/` del entorno de prueba usan enlaces firmados y no aceptan el token
+interno de administración como credencial de reproducción. La lista no contiene
+las URLs de fuente. No se almacenan claves de reproducción en localStorage ni en
+el catálogo o su respaldo JSON. Los tokens de lista expiran en 7 días y las sesiones
+son volátiles. La suspensión/paquete se revisa con caché máxima de 0,5 s.
+
+API y panel de prueba tienen 32 hilos HTTP como máximo y tiempo de lectura de 10 s.
+El monitor separado tiene 16 hilos; su escaneo de procesos se actualiza cada 10 s.
+CPU, memoria, red y snapshot general conservan el intervalo de 2 s.

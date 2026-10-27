@@ -72,3 +72,66 @@ systemctl stop nexo-test
 ```
 
 Pruebas locales: autenticación, Host/Origin, catálogo, métricas, detector de revisiones, instalación simulada, conservación de datos y reversión. La instalación completa con systemd en una VM Debian 13 real sigue pendiente de validación. El modo de prueba no implementa retransmisión de vídeo.
+
+
+## Entrega de TV experimental 0.7
+
+Esta función es opcional y **solo se sirve por el túnel SSH existente**. No abrir
+8088 en el firewall. El puerto y la dirección local de la M3U deben coincidir con
+los usados al abrir el panel. El reproductor se ejecuta en el mismo PC que PuTTY.
+No hay que suministrar al reproductor la contraseña de administrador.
+
+Para una instalación NUEVA con video:
+
+```sh
+apt-get update && apt-get install -y curl
+curl -fsSL https://raw.githubusercontent.com/manolin-gitlab/nexo/main/install-quick.sh -o /root/nexo-instalar.sh
+bash /root/nexo-instalar.sh --with-streaming
+```
+
+Para una instalación de PRUEBA ya existente, actualiza primero a 0.7 desde
+**Actualizaciones**, conservando su catálogo, y activa después:
+
+```sh
+apt-get update && apt-get install -y ffmpeg
+python3 /opt/nexo-test/backend/streaming_setup.py --enable
+systemctl restart nexo-test.service
+```
+
+El activador conserva las credenciales y genera una clave privada de reproducción
+si todavía no existe. No usarlo sobre el archivo de configuración de producción.
+Para desactivar:
+
+```sh
+python3 /opt/nexo-test/backend/streaming_setup.py --disable
+systemctl restart nexo-test.service
+```
+
+1. Añade una fuente HTTP(S) de prueba con video H.264 y audio AAC.
+2. Crea un paquete, asígnale el canal y registra un cliente habilitado y vigente.
+3. Abre **Content → Entrega de TV** para ver que el motor está habilitado.
+4. En **Clientes**, descarga su M3U y ábrela con VLC en el PC del túnel.
+5. Revisa proceso, sesiones y caché en Entrega de TV; suspende el cliente para
+   comprobar el rechazo de nuevas solicitudes. El video ya almacenado en el
+   reproductor puede continuar hasta agotar su buffer.
+
+La primera reproducción espera hasta 12 segundos a que haya una playlist. Si la
+fuente no inicia, reabre la lista después de comprobar su disponibilidad. El
+supervisor reintenta con espera de 2 a 60 segundos. No hay fuente alternativa
+ni recodificación automática de códecs incompatibles.
+
+Valores de laboratorio: 8 canales iniciados, 64 sesiones globales, 32 solicitudes
+HTTP simultáneas; umbral observado de caché de 512 MiB y reserva mínima de disco
+256 MiB. Estas cifras son límites de protección, **no capacidad de usuarios
+certificada**. El umbral no es una cuota dura: se comprueba cada 0,5 s y un archivo
+en curso puede superarlo. No se configura tmpfs ni se cambian parámetros de red.
+
+Una sesión ocupa el cupo del cliente hasta 30 segundos tras su última solicitud.
+Para cambiar de canal cuando esté ocupado, espera o usa **Detener** en el panel.
+El proceso del canal se apaga después del vencimiento de sus sesiones más 30 s
+sin audiencia. Reiniciar/actualizar elimina todas las sesiones; reabre la lista.
+Los enlaces de lista duran 7 días y son credenciales que deben mantenerse privadas.
+No hay DRM ni identificación fiable de dispositivos que compartan un enlace de
+sesión. No se ha validado aún en un televisor o decodificador físico.
+
+[Diseño y siguiente etapa de distribución](../docs/streaming-design.md).

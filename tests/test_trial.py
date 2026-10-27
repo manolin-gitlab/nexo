@@ -87,8 +87,19 @@ class Installation(unittest.TestCase):
         self.assertEqual((root/'etc/nexo-test-access.txt').stat().st_mode&0o777,0o600)
         self.assertEqual((root/'var/lib/nexo-test').stat().st_mode&0o777,0o700)
         self.assertIn('name="nexo-test" content="loopback"',(root/'opt/nexo-test/panel/index.html').read_text())
+        self.assertTrue((root/'opt/nexo-test/panel/downloads/nexo-monitor.zip').is_file())
+        self.assertIn('NEXO_TEST_STREAMING=0',(root/'etc/nexo-test.env').read_text())
         self.assertTrue(any(c[-2:]==['--now','nexo-test.service'] for c in calls))
         self.assertFalse(any('nginx' in ' '.join(c) for c in calls))
+
+    def test_streaming_fresh_install_generates_a_separate_private_playback_key(self):
+        root=self.target()
+        with patch.object(m.os,'chown'):
+            env=m.install(ROOT,'a'*40,tx=m.common.Transaction(root),runner=lambda *_:None,
+                check_health=lambda *_:None,account_ids=(os.getuid(),os.getgid()),streaming=True)
+        self.assertEqual(env['NEXO_TEST_STREAMING'],'1')
+        self.assertGreaterEqual(len(env['NEXO_STREAM_KEY']),43)
+        self.assertNotEqual(env['NEXO_STREAM_KEY'],env['NEXO_TEST_PASSWORD'])
 
     def test_start_failure_rolls_back_only_test_installation(self):
         root=self.target();(root/'etc/nexo-api.env').write_text('preserve existing installation')
@@ -136,7 +147,7 @@ class Installation(unittest.TestCase):
     def test_production_06_upgrade_is_adopted_once_without_erasing_catalog(self):
         root=self.target();code=root/'opt/nexo-iptv';m.prepare(ROOT,code,'production',None)
         (code/'installed.json').unlink()
-        api_file=code/'backend/nexo_api.py';api_file.write_text(api_file.read_text().replace("VERSION = '0.6.1'","VERSION = '0.6.0'"))
+        api_file=code/'backend/nexo_api.py';api_file.write_text(api_file.read_text().replace("VERSION = '0.7.0'","VERSION = '0.6.0'"))
         state=root/'var/lib/nexo-iptv';state.mkdir(mode=0o700)
         catalog=api.Catalog(state/'catalog.sqlite3');catalog.write(api.EMPTY,0)
         (root/'etc/nexo-api.env').write_text('NEXO_API_TOKEN='+('a'*64)+'\n')

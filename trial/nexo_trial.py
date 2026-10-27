@@ -8,6 +8,7 @@ import mimetypes
 import os
 from pathlib import Path
 import re
+import signal
 import threading
 from http.server import ThreadingHTTPServer
 from urllib.parse import unquote, urlsplit
@@ -19,9 +20,9 @@ def load(name, path):
     return module
 
 
-def handler_class(root, catalog_module, catalog, collector, username, password, port, updates=None):
+def handler_class(root, catalog_module, catalog, collector, username, password, port, updates=None, streaming=None):
     root = Path(root); origin = 'http://localhost:'+str(port)
-    parent = catalog_module.handler_class(catalog, '', origin, updates, root/'.maintenance')
+    parent = catalog_module.handler_class(catalog, '', origin, updates, root/'.maintenance', streaming)
     expected = (username + ':' + password).encode('utf-8')
     class Handler(parent):
         def send_response(self, code, message=None):
@@ -44,11 +45,25 @@ def handler_class(root, catalog_module, catalog, collector, username, password, 
             return True
 
         def do_GET(self):
+            if self.path.startswith('/tv/'):
+                if streaming: streaming.handle(self, 'localhost:'+str(port))
+                else: self.send_json(404, {'error': 'not_found'})
+                return
             if self.path.startswith('/api/'):
                 super().do_GET(); return
             if not self.authorized(): return
             if self.path == '/v1/snapshot':
-                self.send_json(200, collector.get()); return
+                data = dict(collector.get())
+                if streaming:
+                    status = streaming.status()
+                    data.update(sessions=[{'id': s['id'], 'client': s['client'], 'channel': s['channel'],
+                                           'ip': s['ip'], 'started_at': s['started'], 'bitrate_bps': None,
+                                           'lat': None, 'lon': None, 'location': ''} for s in status['sessions']],
+                                sessions_status='available', sessions_timestamp=data['timestamp'])
+                    data['streaming'] = {'live': sum(w['state']=='live' for w in status['workers']),
+                                         'starting': sum(w['state']=='starting' for w in status['workers']),
+                                         'failed': sum(w['state'] not in ('live','starting') for w in status['workers'])}
+                self.send_json(200, data); return
             parsed = urlsplit(self.path)
             if parsed.scheme or parsed.netloc:
                 self.send_json(404, {'error': 'not_found'}); return
@@ -81,13 +96,23 @@ def main():
         raise ValueError('Configura las credenciales privadas de prueba.')
     if not 1024 <= port <= 65535: raise ValueError('Puerto no válido.')
     catalog = api.Catalog(os.environ.get('NEXO_TEST_DB', '/var/lib/nexo-test/catalog.sqlite3'))
-    collector = monitor.Collector(name='Nexo — servidor de prueba', disks=['/'])
+    collector = monitor.Collector(name='Nexo — servidor de prueba', disks=['/'], ports={port})
     collector.sample(); threading.Thread(target=collector.run, daemon=True).start()
     updates = updater.Manager(root/'installed.json', catalog.path.parent/'update-baseline.json')
-    server = ThreadingHTTPServer(('127.0.0.1', port), handler_class(root, api, catalog, collector, username, password, port, updates))
-    server.daemon_threads = True
+    limits = load('nexo_trial_http_limits', root/'backend/http_limits.py')
+    streaming = None
+    if os.getenv('NEXO_TEST_STREAMING') == '1':
+        relay_module = load('nexo_trial_relay', root/'backend/streaming.py')
+        streaming = relay_module.Relay(catalog, catalog.path.parent, os.getenv('NEXO_STREAM_KEY', ''))
+    server = limits.BoundedHTTPServer(('127.0.0.1', port), handler_class(root, api, catalog, collector, username, password, port, updates, streaming))
     print('Nexo test ready on loopback. Access through an SSH tunnel.', flush=True)
-    server.serve_forever()
+    def stop(*_): raise KeyboardInterrupt()
+    signal.signal(signal.SIGTERM, stop)
+    try: server.serve_forever()
+    except KeyboardInterrupt: pass
+    finally:
+        if streaming: streaming.close()
+        server.server_close()
 
 
 if __name__ == '__main__': main()

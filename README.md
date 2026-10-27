@@ -1,6 +1,14 @@
-# Nexo IPTV — v0.6.1
+# Nexo IPTV — v0.7.0
 
 Panel independiente en español para organizar un servicio IPTV y monitorizar un servidor Linux. La instalación Debian guarda clientes, canales y paquetes en SQLite en el servidor; la copia estática conserva el modo local. La monitorización utiliza un agente de lectura para Linux.
+
+## Entrega de TV experimental v0.7
+
+El entorno de prueba ahora puede entregar HLS: ingesta bajo demanda, un FFmpeg compartido por canal y `-c copy` sin recodificar. Comprueba cliente, vigencia y paquete en cada segmento, aplica límites de sesiones y permite detenerlas desde **Content → Entrega de TV**. La fuente se detiene cuando ya no tiene audiencia, y el supervisor reintenta las fuentes caídas con espera entre intentos.
+
+**Solo para pruebas a través del túnel SSH.** No se activa al actualizar. La entrega masiva con Nginx, el balanceo, la compatibilidad con decodificadores y una prueba de carga sostenida siguen pendientes. [Diseño, revisión y límites](docs/streaming-design.md) · [Validación](docs/validation-0.7.md).
+
+Instalación nueva: descarga el script de abajo y ejecuta `bash /root/nexo-instalar.sh --with-streaming`. En una prueba ya instalada, primero actualiza desde el panel y después sigue la [activación de HLS](trial/README.md#entrega-de-tv-experimental-07). Las listas protegidas se descargan desde Clientes cuando el motor está habilitado; nunca se sustituyen por URLs de origen si falla la petición.
 
 ## Prueba rápida y actualizaciones
 
@@ -132,6 +140,6 @@ Pruebas automatizadas: cálculo CPU, memoria disponible, tasas y reset de contad
 
 ## Límites del servicio IPTV
 
-Hay una API central de administración del catálogo. Siguen pendientes la autenticación de reproductores, FFmpeg, retransmisión de vídeo, EPG, VOD, revendedores y cobros. Las listas M3U contienen URLs de origen: vencimiento/suspensión bloquean nuevas exportaciones, pero no revocan listas ya descargadas. Los límites de conexiones registrados todavía no se aplican al streaming. No introducir secretos en URLs de canales.
+Hay una API central de administración del catálogo. En la instalación normal HTTPS siguen pendientes el motor de distribución pública, EPG, VOD, revendedores y cobros. En el entorno SSH se puede activar HLS experimental con comprobación de acceso y sesiones. Sin ese motor, las listas M3U contienen URLs de origen y no tienen revocación. Las listas directas piden confirmación antes de exportar. No introducir secretos en URLs de canales.
 
 El catálogo de la instalación Debian se comparte en el servidor; la copia estática y el inventario de nodos siguen siendo locales al navegador. La telemetría es volátil y no hay histórico persistente. Esta versión todavía no reemplaza XUI One en producción.

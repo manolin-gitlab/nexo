@@ -15,7 +15,7 @@ import stat
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
-VERSION = '0.6.1'
+VERSION = '0.7.0'
 MAX_BODY = 5_000_000
 EMPTY = {'clients': [], 'channels': [], 'packages': []}
 
@@ -140,7 +140,7 @@ class Catalog:
         return {'revision': revision + 1, 'catalog': clean}
 
 
-def handler_class(catalog, token, origin, updates=None, maintenance_file=None):
+def handler_class(catalog, token, origin, updates=None, maintenance_file=None, streaming=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = 'NexoCatalog'
 
@@ -179,6 +179,8 @@ def handler_class(catalog, token, origin, updates=None, maintenance_file=None):
             try:
                 if self.path == '/api/v1/updates':
                     self.send_json(200, updates.status() if updates else {'state': 'unconfigured', 'available': None})
+                elif self.path == '/api/v1/streaming':
+                    self.send_json(200, streaming.status() if streaming else {'enabled': False, 'experimental': True})
                 elif self.path == '/api/v1/healthz':
                     catalog.read()
                     self.send_json(200, {'status': 'ok', 'version': VERSION})
@@ -233,6 +235,8 @@ def handler_class(catalog, token, origin, updates=None, maintenance_file=None):
                 self.send_json(405, {'error': 'method_not_allowed'})
 
         def do_POST(self):
+            if self.path in ('/api/v1/streaming/playlist', '/api/v1/streaming/stop'):
+                self.streaming_post(); return
             if self.path != '/api/v1/updates/check':
                 self.unsupported(); return
             if not self.authorized(): return
@@ -250,6 +254,40 @@ def handler_class(catalog, token, origin, updates=None, maintenance_file=None):
             except (ValueError, TypeError, OSError):
                 self.send_json(400, {'error': 'invalid_request'}); return
             self.send_json(200, updates.status(force=True))
+
+        def streaming_post(self):
+            if not self.authorized(): return
+            if self.headers.get('Origin') != origin:
+                self.send_json(403, {'error': 'origin_required'}); return
+            if maintenance_file and Path(maintenance_file).exists():
+                self.send_json(503, {'error': 'maintenance'}); return
+            if not streaming:
+                self.send_json(503, {'error': 'streaming_disabled'}); return
+            try:
+                if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length', [])) != 1:
+                    raise ValueError()
+                length = int(self.headers.get('Content-Length', '0'))
+                if not 0 < length <= 2048 or self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
+                    raise ValueError()
+                raw = self.rfile.read(length)
+                if len(raw) != length: raise ValueError()
+                data = json.loads(raw)
+                field = 'client_id' if self.path.endswith('/playlist') else 'session_id'
+                if not isinstance(data, dict) or set(data) != {field} or not isinstance(data[field], str):
+                    raise ValueError()
+                if field == 'client_id':
+                    self.send_json(200, {'playlist': streaming.playlist(data[field], origin)})
+                else:
+                    self.send_json(200, {'closed': streaming.close_session(data[field])})
+            except (ValueError, TypeError, UnicodeError, RecursionError):
+                self.send_json(400, {'error': 'invalid_request'})
+            except (sqlite3.Error, OSError):
+                self.send_json(503, {'error': 'storage_unavailable'})
+            except Exception as exc:
+                # Relay access errors expose only fixed codes, never source URLs.
+                if hasattr(exc, 'status') and hasattr(exc, 'code'):
+                    self.send_json(exc.status, {'error': exc.code})
+                else: raise
 
         do_DELETE = do_PATCH = do_OPTIONS = unsupported
     return Handler
@@ -274,7 +312,8 @@ def main():
         if not 1 <= port <= 65535:
             raise ValueError('Puerto de API no válido.')
         catalog = Catalog(os.environ.get('NEXO_API_DB', '/var/lib/nexo-iptv/catalog.sqlite3'))
-        class Server(ThreadingHTTPServer):
+        from http_limits import BoundedHTTPServer
+        class Server(BoundedHTTPServer):
             address_family = socket.AF_INET6 if ':' in bind else socket.AF_INET
             daemon_threads = True
         from updates import Manager

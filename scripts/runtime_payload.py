@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import zipfile
 
 
 def update_module(root):
@@ -32,7 +33,7 @@ def metadata(root, kind, commit=None):
         raw = path.read_bytes()
         hashes[name] = hashlib.sha1(b'blob '+str(len(raw)).encode()+b'\0'+raw).hexdigest()
     required = {'nexo-release.json', 'dist/index.html', 'dist/catalog-client.js', 'dist/monitor.js',
-                'backend/nexo_api.py', 'backend/updates.py', 'agent/nexo_monitor.py'}
+                'backend/nexo_api.py', 'backend/updates.py', 'backend/http_limits.py', 'agent/nexo_monitor.py'}
     if kind == 'trial': required.add('trial/nexo_trial.py')
     if not required <= set(hashes): raise ValueError('Faltan componentes de la aplicación.')
     return {**version, 'source_commit': commit, 'source_files': hashes, 'install_kind': kind}
@@ -56,10 +57,12 @@ def prepare(root, target, kind, commit=None):
             continue
         shutil.copyfile(path, destination); destination.chmod(0o644)
     downloads = target/'panel/downloads'; downloads.mkdir()
-    for name in ('nexo-monitor.zip',):
-        p = root/'dist/downloads'/name
-        if p.is_file() and not p.is_symlink():
-            shutil.copyfile(p, downloads/name); (downloads/name).chmod(0o644)
+    # Build from tracked source: GitHub archives need not contain generated ZIPs.
+    with zipfile.ZipFile(downloads/'nexo-monitor.zip','w',zipfile.ZIP_DEFLATED) as archive:
+        for name in ('nexo_monitor.py','nexo-monitor.service','README.md','nginx.conf.example'):
+            p = root/'agent'/name
+            if p.is_symlink() or not p.is_file(): raise ValueError('Falta un archivo del agente: '+name)
+            archive.writestr('nexo-monitor/'+name,p.read_bytes())
     index = target/'panel/index.html'
     html = index.read_text()
     marker = '<meta name="nexo-catalog" content="local">'

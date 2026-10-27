@@ -18,7 +18,7 @@ import sys
 import time
 from urllib.parse import urlsplit
 
-VERSION = '0.6.1'
+VERSION = '0.7.0'
 ACCOUNT = 'nexo-monitor'
 ACCOUNTS = (ACCOUNT, 'nexo-api')
 TARGETS = ['/opt/nexo-iptv', '/etc/nexo-iptv', '/etc/nexo-monitor.env',
@@ -90,7 +90,7 @@ def verify_payload(bundle):
         if size > 10_000_000 or total > 50_000_000 or hashlib.sha256(p.read_bytes()).hexdigest() != digest:
             raise ValueError('Fallo de integridad del paquete.')
     for required in ('payload/panel/index.html', 'payload/agent/nexo_monitor.py', 'payload/agent/nexo-monitor.service',
-                     'payload/installed.json','payload/backend/updates.py', 'payload/backend/nexo_api.py', 'payload/backend/nexo-api.service', 'payload/panel/catalog-client.js'):
+                     'payload/installed.json','payload/backend/updates.py', 'payload/backend/http_limits.py', 'payload/backend/nexo_api.py', 'payload/backend/nexo-api.service', 'payload/panel/catalog-client.js'):
         if required not in files:
             raise ValueError('Faltan componentes obligatorios.')
     return len(files)

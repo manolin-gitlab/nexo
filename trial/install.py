@@ -89,7 +89,7 @@ def fresh_check(port):
     with socket.socket() as sock: sock.bind(('127.0.0.1', port))
 
 
-def install(source, commit, port=8088, tx=None, runner=common.run, check_health=health, account_ids=None):
+def install(source, commit, port=8088, tx=None, runner=common.run, check_health=health, account_ids=None, streaming=False):
     tx = tx or common.Transaction()
     created = started = False
     try:
@@ -100,6 +100,7 @@ def install(source, commit, port=8088, tx=None, runner=common.run, check_health=
         password = secrets.token_urlsafe(32)
         env = {'NEXO_TEST_USER': 'administrador', 'NEXO_TEST_PASSWORD': password,
                'NEXO_TEST_PORT': str(port), 'NEXO_TEST_DB': '/var/lib/nexo-test/catalog.sqlite3'}
+        env.update(NEXO_TEST_STREAMING='1' if streaming else '0', NEXO_STREAM_KEY=secrets.token_urlsafe(32))
         tx.write('/etc/nexo-test.env', ''.join(k+'='+v+'\n' for k,v in env.items()), 0o600)
         tx.write('/etc/nexo-test-access.txt', 'URL: http://localhost:'+str(port)+'\nUsuario: administrador\nContraseña: '+password+
                  '\nAcceso mediante túnel SSH; no abrir el puerto en el firewall.\n', 0o600)
@@ -230,6 +231,7 @@ def main():
     parser.add_argument('--port',type=int,default=8088)
     parser.add_argument('--source-commit',required=True)
     parser.add_argument('--revision')
+    parser.add_argument('--with-streaming',action='store_true',help='Activa HLS experimental en una instalación nueva de prueba')
     args=parser.parse_args()
     try:
         os.umask(0o077);host_check()
@@ -241,14 +243,16 @@ def main():
                 raise ValueError('El archivo de bloqueo no es seguro.')
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
             if args.update:
+                if args.with_streaming:raise ValueError('Actualiza primero; activa HLS después según trial/README.md.')
                 kinds=[args.kind] if args.kind else [k for k,v in KINDS.items() if (Path(v['code'])/'installed.json').is_file()]
                 if len(kinds)!=1:raise ValueError('Indica --kind trial o --kind production para elegir la instalación.')
                 if args.check:print('Revisión y sistema válidos. La actualización no se ejecutó.');return 0
                 result=update(ROOT,args.source_commit,kinds[0]);print('Actualizado: '+args.source_commit[:12]+'\nRespaldo: '+result['backup']);return 0
             if args.kind and args.kind!='trial':raise ValueError('La instalación rápida crea solo el entorno de prueba.')
             fresh_check(args.port)
+            if args.with_streaming and not os.access('/usr/bin/ffmpeg',os.X_OK):raise ValueError('Instala primero el paquete ffmpeg de Debian.')
             if args.check:print('Requisitos correctos. No se instaló Nexo.');return 0
-            install(ROOT,args.source_commit,args.port)
+            install(ROOT,args.source_commit,args.port,streaming=args.with_streaming)
             print('Nexo de prueba instalado.\n1. Crea un túnel SSH: puerto local '+str(args.port)+' → 127.0.0.1:'+str(args.port)+
                   '\n2. Abre http://localhost:'+str(args.port)+'\n3. Consulta las credenciales con: cat /etc/nexo-test-access.txt')
             return 0

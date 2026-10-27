@@ -129,6 +129,15 @@ class Metrics(unittest.TestCase):
         self.assertIsNone(data['cpu']['percent'])
         self.assertIsNone(data['network']['rx_bps'])
 
+    def test_process_scan_is_cached_for_ten_seconds_with_its_own_timestamp(self):
+        with patch.object(m,'process_metrics',return_value=([],{},0,False)) as scan:
+            collector=m.Collector()
+            first=collector.sample();second=collector.sample();collector.sample()
+            self.assertEqual(scan.call_count,1)
+            self.assertEqual(first['processes_timestamp'],second['processes_timestamp'])
+            collector.process_time-=10
+            collector.sample();self.assertEqual(scan.call_count,2)
+
 class Auth(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

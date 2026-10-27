@@ -1,0 +1,1 @@
+.stream-body{padding:22px}.stream-body>p{margin:0 0 18px;line-height:1.7}.stream-body h3{margin:26px 0 12px}.stream-body .stats{grid-template-columns:repeat(3,minmax(0,1fr))}.stream-body .stat-value{font-size:26px}@media(max-width:720px){.stream-body{padding:16px}.stream-body .stats{grid-template-columns:1fr}}

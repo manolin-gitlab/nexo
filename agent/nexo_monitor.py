@@ -18,7 +18,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 
 def utcnow():
     return dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z')
@@ -237,6 +237,7 @@ class Collector:
         self.previous_stat = None
         self.previous_processes = {}
         self.process_time = None
+        self.cached_processes = None
         self.latest = None
         self.lock = threading.Lock()
 
@@ -326,13 +327,14 @@ class Collector:
             data['connections']['truncated'] = len(peers) > 1000
         data['sessions'], data['sessions_timestamp'], data['sessions_status'] = read_sessions(self.sessions_file)
         try:
-            procs, counters, skipped, truncated = process_metrics(self.proc, self.previous_processes,
-                now - self.process_time if self.process_time is not None else 0,
-                os.cpu_count() or 1, os.sysconf('SC_CLK_TCK'), os.sysconf('SC_PAGE_SIZE'))
-            data['processes'] = procs
-            data['processes_status'] = 'partial' if skipped else 'available'
-            data['processes_truncated'] = truncated
-            self.previous_processes, self.process_time = counters, now
+            if self.process_time is None or now-self.process_time >= 10:
+                procs, counters, skipped, truncated = process_metrics(self.proc, self.previous_processes,
+                    now - self.process_time if self.process_time is not None else 0,
+                    os.cpu_count() or 1, os.sysconf('SC_CLK_TCK'), os.sysconf('SC_PAGE_SIZE'))
+                self.cached_processes = {'processes': procs, 'processes_status': 'partial' if skipped else 'available',
+                                         'processes_truncated': truncated, 'processes_timestamp': data['timestamp']}
+                self.previous_processes, self.process_time = counters, now
+            if self.cached_processes: data.update(self.cached_processes)
         except (OSError, ValueError):
             errors.append('processes_unavailable')
         with self.lock:
@@ -352,6 +354,9 @@ class Collector:
 def handler_class(collector, token, origin):
     class Handler(BaseHTTPRequestHandler):
         server_version = 'NexoMonitor'
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(10)
         def log_message(self, *_):
             pass  # Do not log IPs, tokens or snapshots.
         def respond(self, status, payload=None):
@@ -444,12 +449,22 @@ def main():
         class Server(ThreadingHTTPServer):
             address_family = socket.AF_INET6 if ':' in bind else socket.AF_INET
             daemon_threads = True
+            slots = threading.BoundedSemaphore(16)
+            def process_request(self, request, client_address):
+                if not self.slots.acquire(False):
+                    self.shutdown_request(request); return
+                try: super().process_request(request, client_address)
+                except Exception:
+                    self.slots.release(); raise
+            def process_request_thread(self, request, client_address):
+                try: super().process_request_thread(request, client_address)
+                finally: self.slots.release()
         server = Server((bind, int(os.getenv('NEXO_PORT', '9108'))), handler_class(collector, token, origin))
         if cert and key:
             tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             tls.minimum_version = ssl.TLSVersion.TLSv1_2
             tls.load_cert_chain(cert, key)
-            server.socket = tls.wrap_socket(server.socket, server_side=True)
+            server.socket = tls.wrap_socket(server.socket, server_side=True, do_handshake_on_connect=False)
         print('Nexo Monitor ready. Read-only telemetry; authentication required.', flush=True)
         server.serve_forever()
     except (ValueError, OSError, KeyError) as exc:

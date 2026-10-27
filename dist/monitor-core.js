@@ -4,6 +4,7 @@
 const numeric=(v,min=0,max=Infinity)=>typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max;
 function snapshot(d,now=Date.now()){
  if(!d||d.schema_version!==1||!Number.isFinite(Date.parse(d.timestamp)))throw Error('Formato de métricas no compatible.');
+ if(d.streaming!==undefined&&(!d.streaming||typeof d.streaming!=='object'||['live','starting','failed'].some(k=>!Number.isInteger(d.streaming[k])||d.streaming[k]<0||d.streaming[k]>32)))throw Error('Estado de señales inválido.');
  const age=now-Date.parse(d.timestamp);if(age>20000||age< -10000)throw Error('La muestra está vencida o el reloj del servidor no está sincronizado.');
  if(!d.server||typeof d.server.name!=='string'||!d.cpu||!d.network||!d.connections||!Array.isArray(d.disks))throw Error('La muestra está incompleta.');
  const optional=(v,min=0,max=Infinity)=>v===null||numeric(v,min,max);

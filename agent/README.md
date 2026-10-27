@@ -145,3 +145,12 @@ El mapa de topología utiliza sockets del sistema. El mapa geográfico utiliza s
 ## Validación y alcance
 
 Incluye pruebas de cálculo, sockets, sesiones vencidas, autenticación y CORS. Se ha probado lectura real en el entorno de desarrollo Linux. La instalación systemd, Nginx/TLS y la conectividad desde el panel hasta **tu servidor** deben verificarse en tu infraestructura; todavía no se han instalado ni comprobado allí. Este agente no transmite vídeo ni implementa la API de abonados de XUI One.
+
+
+### Monitor 0.5.1: coste de muestreo
+
+CPU, memoria y red siguen muestreándose cada 2 segundos. El recorrido de procesos
+se hace cada 10 segundos y añade `processes_timestamp`; la UI muestra su fecha.
+Esto evita recorrer todos los PID cinco veces mientras se conserva una misma
+vista de procesos. La API separada limita a 16 hilos y 10 s la lectura de cada
+solicitud. Las respuestas del catálogo/panel de prueba tienen su propio límite.

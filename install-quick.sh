@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 if [ "${1:-}" = --help ]; then
-    echo 'Nexo de prueba: install-quick.sh [--port 8088] [--check]'
+    echo 'Nexo de prueba: install-quick.sh [--port 8088] [--with-streaming] [--check]'
     echo 'Actualizar conservando datos: install-quick.sh --update [--kind trial|production]'
     exit 0
 fi
@@ -13,7 +13,11 @@ fi
 [ -d /run/systemd/system ] || { echo 'Se requiere una VM con systemd.' >&2; exit 1; }
 umask 077
 apt-get update
-DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 curl ca-certificates passwd
+streaming_package=
+for argument in "$@"; do
+    if [ "$argument" = --with-streaming ]; then streaming_package=ffmpeg; fi
+done
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 curl ca-certificates passwd $streaming_package
 work=$(mktemp -d /tmp/nexo-quick.XXXXXXXX)
 trap 'rm -rf -- "$work"' EXIT HUP INT TERM
 requested=

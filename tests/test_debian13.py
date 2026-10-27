@@ -22,6 +22,7 @@ def payload(directory):
     (bundle/'payload/panel/catalog-client.js').write_text('// client fixture')
     (bundle/'payload/backend/nexo_api.py').write_text('# catalog fixture')
     (bundle/'payload/backend/updates.py').write_text('# updates fixture')
+    (bundle/'payload/backend/http_limits.py').write_text('# http limits fixture')
     (bundle/'payload/installed.json').write_text('{}')
     (bundle/'payload/backend/nexo-api.service').write_text('ExecStart=/usr/bin/python3 /opt/nexo-iptv/backend/nexo_api.py\n')
     (bundle/'payload/agent/nexo_monitor.py').write_text('# agent fixture')
@@ -50,7 +51,7 @@ class Installer(unittest.TestCase):
 
     def test_payload_tamper_extra_file_and_symlink(self):
         with tempfile.TemporaryDirectory() as tmp:
-            b=payload(tmp);self.assertEqual(m.verify_payload(b),8)
+            b=payload(tmp);self.assertEqual(m.verify_payload(b),9)
             p=b/'payload/panel/index.html';p.write_text('changed')
             with self.assertRaises(ValueError):m.verify_payload(b)
         with tempfile.TemporaryDirectory() as tmp:
