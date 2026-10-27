@@ -1,6 +1,14 @@
-# Nexo IPTV — v0.5.1
+# Nexo IPTV — v0.6.0
 
-Panel independiente en español para organizar un servicio IPTV y monitorizar un servidor Linux. El catálogo se guarda en el navegador; la monitorización utiliza un agente de lectura para Linux.
+Panel independiente en español para organizar un servicio IPTV y monitorizar un servidor Linux. La instalación Debian guarda clientes, canales y paquetes en SQLite en el servidor; la copia estática conserva el modo local. La monitorización utiliza un agente de lectura para Linux.
+
+## Catálogo compartido v0.6
+
+La instalación nueva de Debian incluye una API central en Python y SQLite, con servicio `nexo-api.service` separado del monitor. El panel utiliza el mismo acceso HTTPS de administrador para leer y guardar clientes, canales y paquetes. Dos navegadores autorizados acceden al mismo catálogo; **Actualizar** carga los cambios de otro equipo. Las escrituras comprueban la revisión para evitar sobrescribir cambios simultáneos. Una caída de la API bloquea los cambios y exportaciones hasta actualizar, sin pasar automáticamente al modo local.
+
+El token interno de la API se mantiene en el servidor y es distinto del token de lectura del monitor. El inventario de servidores sigue en el navegador y las métricas siguen siendo volátiles. La [guía del backend](backend/README.md) detalla autenticación, límites, importación y respaldo.
+
+Los respaldos JSON anteriores se pueden restaurar tras validar sus referencias y campos. La importación reemplaza el catálogo central y exige confirmación. La versión estática no transmite automáticamente sus datos a la API. Esta entrega sigue siendo un instalador inicial: **no actualizar sobre una instalación Nexo existente**.
 
 ## Descargar y probar el instalador
 
@@ -25,15 +33,15 @@ sudo ./install.sh --apply \
   --tls-key /ruta/privkey.pem
 ```
 
-Sustituye el dominio y las rutas. Las credenciales generadas quedan en `/etc/nexo-iptv/access.txt`, legible solo por root. Consulta la [guía del instalador](install/debian13/README.md) antes de ejecutar `--apply`. Este paquete instala el panel y el monitor; el motor de streaming sigue pendiente.
+Sustituye el dominio y las rutas. Las credenciales generadas quedan en `/etc/nexo-iptv/access.txt`, legible solo por root. Consulta la [guía del instalador](install/debian13/README.md) antes de ejecutar `--apply`. Este paquete instala el panel, el catálogo central y el monitor; el motor de streaming sigue pendiente.
 
 ## Instalador inicial para Debian 13
 
-`dist/downloads/nexo-debian13.tar.gz` incluye el panel estático, el agente y `install.sh` / `install.py`, con manifiesto de integridad y guía en español. Objetivo: VM dedicada Debian 13 amd64/arm64 con Python 3.13, systemd, Nginx, OpenSSL y un certificado válido ya provisionado. `--check` comprueba requisitos; `--install-deps` instala dependencias de Debian explícitamente; `--apply` instala y arranca Nexo. La guía completa está en `install/debian13/README.md` y dentro del paquete.
+`dist/downloads/nexo-debian13.tar.gz` incluye el panel web, la API central, el agente y `install.sh` / `install.py`, con manifiesto de integridad y guía en español. Objetivo: VM dedicada Debian 13 amd64/arm64 con Python 3.13, systemd, Nginx, OpenSSL y un certificado válido ya provisionado. `--check` comprueba requisitos; `--install-deps` instala dependencias de Debian explícitamente; `--apply` instala y arranca Nexo. La guía completa está en `install/debian13/README.md` y dentro del paquete.
 
-La instalación genera credenciales privadas nuevas, protege el panel con HTTP Basic sobre HTTPS, mantiene el agente en loopback con token y crea un virtual host propio. Rechaza rutas/cuentas Nexo existentes y no es un actualizador de instalaciones previas. Incluye reversión de sus propios archivos/cuenta/servicio ante fallos y no instala ni migra XUI. El origen mostrado en el diálogo de conexión se obtiene del sitio actual, para que también funcione autoalojado.
+La instalación genera credenciales privadas nuevas, protege el panel con HTTP Basic sobre HTTPS, mantiene la API y el agente en loopback con tokens separados y crea un virtual host propio. Rechaza rutas/cuentas Nexo existentes y no es un actualizador de instalaciones previas. Incluye reversión de sus propios archivos/cuenta/servicio ante fallos y no instala ni migra XUI. El origen mostrado en el diálogo de conexión se obtiene del sitio actual, para que también funcione autoalojado.
 
-El instalador y su reversión se prueban con destinos temporales y comandos simulados, además de hash real OpenSSL e integridad del archivo final. No se ha ejecutado la instalación completa en una VM Debian 13 real; este entorno es Ubuntu 24.04/Python 3.12. No instala el motor IPTV pendiente, base de abonados ni streaming FFmpeg.
+El instalador y su reversión se prueban con destinos temporales y comandos simulados, además de hash real OpenSSL e integridad del archivo final. No se ha ejecutado la instalación completa en una VM Debian 13 real; este entorno es Ubuntu 24.04/Python 3.12. No instala el motor IPTV pendiente ni streaming FFmpeg; la base central guarda configuración del catálogo, sin autenticar reproductores.
 
 ## Recursos v0.5 y revisión del relevamiento
 
@@ -46,8 +54,6 @@ El repositorio contiene el código de la aplicación y sus pruebas. Los informes
 Se incluye `audit/xui_structure.py`, su guía `audit/README.md`, una copia descargable en `dist/downloads/xui_structure.py` y el paquete `dist/downloads/nexo-audit.zip`. El recolector v2 es compatible con Python 3.8+ y no necesita dependencias. Además de estructura de archivos, servicios, puertos y rutas filtradas, recoge discos/inodos, versiones de paquetes y muestras de CPU, RAM, tráfico y procesos durante 15 segundos. No exporta registros ni IP de clientes, contraseñas, valores de licencia, código fuente, argumentos de procesos o configuraciones completas. No modifica/reinicia servicios ni hace solicitudes externas. El acceso opcional a MySQL es por socket local sin leer credenciales, y solo consulta `SHOW DATABASES` e `information_schema` (columnas, tablas, claves externas). Revisar el JSON antes de compartirlo.
 
 Desde PuTTY, tras copiar el script al servidor: `python3 /root/xui_structure.py --seconds 15 --output /root/nexo-audit.json`. El informe se crea con permisos 600 y no sobrescribe archivos existentes. No se publica ningún informe del servidor en este repositorio. Los datos de prueba locales tampoco se incorporan al paquete.
-
-Esta sesión no pudo acceder al servidor por SSH: el entorno devolvió `Network is unreachable` antes de autenticar. No se ha realizado una auditoría de la instalación remota ni se han utilizado o guardado credenciales SSH en el proyecto.
 
 ## Servidores v0.4
 
@@ -75,7 +81,7 @@ Las tarjetas muestran sockets TCP, sesiones IPTV, señales en vivo/caídas y tr�
 - **Mapa de conexiones:** topología servidor → IP, inspección, filtro y enmascaramiento de direcciones. Cuenta sockets TCP establecidos, no espectadores.
 - **Mapa geográfico:** ubicaciones proporcionadas por las sesiones del servicio IPTV. No usa servicios externos de búsqueda por IP. Basemap Natural Earth a través de world-atlas@2.0.2, licencia en dist/world-atlas-LICENSE.txt.
 - **Agente Linux:** Python 3.8+ sin dependencias, lecturas de /proc y statvfs, API de solo lectura con token, CORS de origen exacto y loopback por defecto. Paquete descargable con servicio systemd y ejemplo Nginx/TLS.
-- **Gestión local:** clientes, paquetes y canales; búsqueda/edición/eliminación, vencimientos, suspensión, exportación M3U, respaldo/restauración JSON.
+- **Gestión central en Debian / local en modo estático:** clientes, paquetes y canales; búsqueda/edición/eliminación, vencimientos, suspensión, exportación M3U, respaldo/restauración JSON.
 
 ## Para obtener métricas reales
 
@@ -101,7 +107,7 @@ Servir `dist/` con un servidor estático. Sin instalación ni compilación para 
 node --check dist/app.js
 node --check dist/monitor.js
 node --check dist/monitor-core.js
-node --test tests/monitor-core.test.cjs
+node --test tests/*.test.cjs
 python3 -m unittest discover -s tests -v
 python3 scripts/package-agent.py
 python3 scripts/package-audit.py
@@ -112,6 +118,6 @@ Pruebas automatizadas: cálculo CPU, memoria disponible, tasas y reset de contad
 
 ## Límites del servicio IPTV
 
-No hay backend central de abonados, FFmpeg, retransmisión de vídeo, EPG, VOD, revendedores ni cobros. Las listas M3U contienen URLs de origen: vencimiento/suspensión bloquean nuevas exportaciones, pero no revocan listas ya descargadas. Los límites de conexiones registrados todavía no se aplican al streaming. No introducir secretos en URLs de canales.
+Hay una API central de administración del catálogo. Siguen pendientes la autenticación de reproductores, FFmpeg, retransmisión de vídeo, EPG, VOD, revendedores y cobros. Las listas M3U contienen URLs de origen: vencimiento/suspensión bloquean nuevas exportaciones, pero no revocan listas ya descargadas. Los límites de conexiones registrados todavía no se aplican al streaming. No introducir secretos en URLs de canales.
 
-Los datos de gestión siguen siendo locales al navegador. La telemetría es volátil; no hay histórico persistente ni sincronización entre equipos. Esta versión todavía no reemplaza XUI One en producción.
+El catálogo de la instalación Debian se comparte en el servidor; la copia estática y el inventario de nodos siguen siendo locales al navegador. La telemetría es volátil y no hay histórico persistente. Esta versión todavía no reemplaza XUI One en producción.

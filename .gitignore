@@ -8,6 +8,12 @@ __pycache__/
 *.log
 access.txt
 nexo-monitor.env
+nexo-api.env
+api-proxy.conf
 .venv/
 node_modules/
 .DS_Store
+
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm

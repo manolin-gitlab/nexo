@@ -28,13 +28,18 @@ with tempfile.TemporaryDirectory(prefix='nexo-debian13-build-') as tmp:
     s = index.read_text()
     import re
     s = re.sub(r'<a\b[^>]*\bdata-debian-installer\b[^>]*>.*?</a>', '', s)
+    assert s.count('<meta name="nexo-catalog" content="local">') == 1
+    s = s.replace('<meta name="nexo-catalog" content="local">', '<meta name="nexo-catalog" content="server">')
     index.write_text(s)
     agent = bundle / 'payload/agent'; agent.mkdir(parents=True)
     for name in ('nexo_monitor.py', 'nexo-monitor.service', 'README.md', 'nginx.conf.example'):
         shutil.copyfile(root / 'agent' / name, agent / name)
+    backend = bundle / 'payload/backend'; backend.mkdir(parents=True)
+    for name in ('nexo_api.py', 'nexo-api.service', 'README.md'):
+        shutil.copyfile(root / 'backend' / name, backend / name)
     files = {p.relative_to(bundle).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
              for p in sorted((bundle / 'payload').rglob('*')) if p.is_file()}
-    (bundle / 'manifest.json').write_text(json.dumps({'version': '0.5.1', 'target': 'debian-13', 'files': files}, indent=2)+'\n')
+    (bundle / 'manifest.json').write_text(json.dumps({'version': '0.6.0', 'target': 'debian-13', 'files': files}, indent=2)+'\n')
     with output.open('wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', filename='', mtime=0) as compressed, \
          tarfile.open(fileobj=compressed, mode='w') as archive:
         for p in [bundle] + sorted(bundle.rglob('*')):
