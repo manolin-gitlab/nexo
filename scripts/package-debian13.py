@@ -8,6 +8,9 @@ import tarfile
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0,str(root/'scripts'))
+from runtime_payload import metadata
 download = root / 'dist/downloads'
 download.mkdir(exist_ok=True)
 output = download / 'nexo-debian13.tar.gz'
@@ -35,11 +38,12 @@ with tempfile.TemporaryDirectory(prefix='nexo-debian13-build-') as tmp:
     for name in ('nexo_monitor.py', 'nexo-monitor.service', 'README.md', 'nginx.conf.example'):
         shutil.copyfile(root / 'agent' / name, agent / name)
     backend = bundle / 'payload/backend'; backend.mkdir(parents=True)
-    for name in ('nexo_api.py', 'nexo-api.service', 'README.md'):
+    for name in ('nexo_api.py', 'updates.py', 'nexo-api.service', 'README.md'):
         shutil.copyfile(root / 'backend' / name, backend / name)
+    (bundle/'payload/installed.json').write_text(json.dumps(metadata(root,'production'),indent=2)+'\n')
     files = {p.relative_to(bundle).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
              for p in sorted((bundle / 'payload').rglob('*')) if p.is_file()}
-    (bundle / 'manifest.json').write_text(json.dumps({'version': '0.6.0', 'target': 'debian-13', 'files': files}, indent=2)+'\n')
+    (bundle / 'manifest.json').write_text(json.dumps({'version': '0.6.1', 'target': 'debian-13', 'files': files}, indent=2)+'\n')
     with output.open('wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', filename='', mtime=0) as compressed, \
          tarfile.open(fileobj=compressed, mode='w') as archive:
         for p in [bundle] + sorted(bundle.rglob('*')):

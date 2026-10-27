@@ -1,0 +1,24 @@
+[Unit]
+Description=Nexo local test panel, catalog and monitor
+After=network.target
+
+[Service]
+Type=simple
+User=nexo-test
+Group=nexo-test
+EnvironmentFile=/etc/nexo-test.env
+ExecStart=/usr/bin/python3 /opt/nexo-test/nexo_trial.py
+StateDirectory=nexo-test
+StateDirectoryMode=0700
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

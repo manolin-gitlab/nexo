@@ -31,3 +31,7 @@ Exportar JSON desde el panel produce una copia consistente del catálogo. Guarda
 La suspensión, el vencimiento y el límite de conexiones todavía no se aplican a vídeo ya distribuido. Las M3U contienen URLs directas y requieren el motor de streaming pendiente para implementar revocación real.
 
 Pruebas: persistencia, escritores simultáneos, conflictos, validación, autenticación, Origin, límites de tamaño, errores HTTP y cliente JavaScript. La instalación completa de Nginx/systemd/TLS en una VM Debian 13 real sigue pendiente de validación.
+
+## Actualizaciones 0.6.1
+
+`GET /api/v1/updates` informa del estado y `POST /api/v1/updates/check` solicita una comprobación, con autenticación y Origin exacto. El comprobador solo consulta metadatos públicos de manolin-gitlab/nexo y no envía registros del catálogo. No existe una ruta HTTP para instalar código. La aplicación muestra un comando SSH que aplica la actualización con respaldo y reversión; el procedimiento completo está en trial/README.md. Las consultas a GitHub usan caché de 15 minutos y un límite mínimo de 30 segundos para comprobaciones forzadas.

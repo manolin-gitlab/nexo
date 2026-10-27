@@ -15,7 +15,7 @@ import stat
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
-VERSION = '0.6.0'
+VERSION = '0.6.1'
 MAX_BODY = 5_000_000
 EMPTY = {'clients': [], 'channels': [], 'packages': []}
 
@@ -140,7 +140,7 @@ class Catalog:
         return {'revision': revision + 1, 'catalog': clean}
 
 
-def handler_class(catalog, token, origin):
+def handler_class(catalog, token, origin, updates=None, maintenance_file=None):
     class Handler(BaseHTTPRequestHandler):
         server_version = 'NexoCatalog'
 
@@ -177,7 +177,9 @@ def handler_class(catalog, token, origin):
             if not self.authorized():
                 return
             try:
-                if self.path == '/api/v1/healthz':
+                if self.path == '/api/v1/updates':
+                    self.send_json(200, updates.status() if updates else {'state': 'unconfigured', 'available': None})
+                elif self.path == '/api/v1/healthz':
                     catalog.read()
                     self.send_json(200, {'status': 'ok', 'version': VERSION})
                 elif self.path == '/api/v1/catalog':
@@ -189,6 +191,9 @@ def handler_class(catalog, token, origin):
 
         def do_PUT(self):
             if not self.authorized():
+                return
+            if maintenance_file and Path(maintenance_file).exists():
+                self.send_json(503, {'error': 'maintenance'})
                 return
             if self.path != '/api/v1/catalog':
                 self.send_json(404, {'error': 'not_found'})
@@ -227,7 +232,26 @@ def handler_class(catalog, token, origin):
             if self.authorized():
                 self.send_json(405, {'error': 'method_not_allowed'})
 
-        do_POST = do_DELETE = do_PATCH = do_OPTIONS = unsupported
+        def do_POST(self):
+            if self.path != '/api/v1/updates/check':
+                self.unsupported(); return
+            if not self.authorized(): return
+            if self.headers.get('Origin') != origin:
+                self.send_json(403, {'error': 'origin_required'}); return
+            if not updates:
+                self.send_json(503, {'error': 'updates_unconfigured'}); return
+            try:
+                if self.headers.get('Transfer-Encoding') or len(self.headers.get_all('Content-Length', [])) != 1:
+                    raise ValueError()
+                length = int(self.headers.get('Content-Length', '0'))
+                if not 0 < length <= 1024 or self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
+                    raise ValueError()
+                if json.loads(self.rfile.read(length)) != {}: raise ValueError()
+            except (ValueError, TypeError, OSError):
+                self.send_json(400, {'error': 'invalid_request'}); return
+            self.send_json(200, updates.status(force=True))
+
+        do_DELETE = do_PATCH = do_OPTIONS = unsupported
     return Handler
 
 
@@ -253,7 +277,10 @@ def main():
         class Server(ThreadingHTTPServer):
             address_family = socket.AF_INET6 if ':' in bind else socket.AF_INET
             daemon_threads = True
-        server = Server((bind, port), handler_class(catalog, token, origin))
+        from updates import Manager
+        root = Path(__file__).resolve().parent.parent
+        updates = Manager(root/'installed.json', catalog.path.parent/'update-baseline.json') if (root/'installed.json').is_file() else None
+        server = Server((bind, port), handler_class(catalog, token, origin, updates, root/'.maintenance'))
         print('Nexo Catalog ready. Loopback only; authenticated proxy required.', flush=True)
         server.serve_forever()
     except (ValueError, OSError, sqlite3.Error) as exc:

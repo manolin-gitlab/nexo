@@ -126,3 +126,7 @@ Se prueban la generación del paquete, integridad, validación de argumentos, cr
 **No se ha ejecutado la instalación completa en una VM Debian 13 real desde esta sesión**, cuyo entorno de desarrollo es Ubuntu 24.04/Python 3.12. Tampoco se ha instalado nada en tu servidor de producción. La validación final de systemd, Nginx y TLS debe hacerse en una VM Debian 13 de prueba antes del uso operativo.
 
 Fuentes: [Debian 13, versiones incluidas](https://www.debian.org/releases/trixie/release-notes/whats-new.en.html), [Nginx: validación y recarga](https://nginx.org/en/docs/beginners_guide.html), [autenticación Basic](https://nginx.org/en/docs/http/ngx_http_auth_basic_module.html), [OpenSSL passwd](https://docs.openssl.org/3.5/man1/openssl-passwd/).
+
+## Centro de actualizaciones
+
+La versión 0.6.1 incluye Management → Actualizaciones. Consulta GitHub y ofrece un comando SSH para actualizar conservando catálogo y credenciales, con respaldo y reversión si falla la salud. No utiliza --apply del instalador inicial para actualizar. Consulta trial/README.md en el repositorio para el procedimiento y el protocolo de compatibilidad.

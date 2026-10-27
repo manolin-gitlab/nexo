@@ -1,6 +1,20 @@
-# Nexo IPTV — v0.6.0
+# Nexo IPTV — v0.6.1
 
 Panel independiente en español para organizar un servicio IPTV y monitorizar un servidor Linux. La instalación Debian guarda clientes, canales y paquetes en SQLite en el servidor; la copia estática conserva el modo local. La monitorización utiliza un agente de lectura para Linux.
+
+## Prueba rápida y actualizaciones
+
+Para probar sin dominio ni certificado, utiliza el [instalador rápido](trial/README.md): prepara un servicio independiente, catálogo SQLite y métricas reales, accesible desde `http://localhost:8088` mediante un túnel SSH de PuTTY. No publica el panel por HTTP en Internet ni modifica Nginx.
+
+```sh
+# Debian 13, como root
+curl -fsSL https://raw.githubusercontent.com/manolin-gitlab/nexo/main/install-quick.sh -o /root/nexo-instalar.sh
+bash /root/nexo-instalar.sh
+```
+
+Si falta curl: `apt-get update && apt-get install -y curl`. Al terminar, configura el túnel según la guía y consulta `/etc/nexo-test-access.txt` en tu terminal para acceder.
+
+**Management → Actualizaciones** consulta `main` de GitHub y muestra nuevas revisiones, fecha de comprobación y cambios. El panel proporciona un comando SSH para aplicar la actualización con respaldo y reversión; nunca instala ni reinicia servicios por visitar la página. Las instalaciones anteriores deben incorporar este módulo una vez; la versión normal 0.6 se puede actualizar con `bash /root/nexo-instalar.sh --update --kind production`. Los detalles, límites y rutas de respaldo están en la guía.
 
 ## Catálogo compartido v0.6
 
@@ -8,7 +22,7 @@ La instalación nueva de Debian incluye una API central en Python y SQLite, con 
 
 El token interno de la API se mantiene en el servidor y es distinto del token de lectura del monitor. El inventario de servidores sigue en el navegador y las métricas siguen siendo volátiles. La [guía del backend](backend/README.md) detalla autenticación, límites, importación y respaldo.
 
-Los respaldos JSON anteriores se pueden restaurar tras validar sus referencias y campos. La importación reemplaza el catálogo central y exige confirmación. La versión estática no transmite automáticamente sus datos a la API. Esta entrega sigue siendo un instalador inicial: **no actualizar sobre una instalación Nexo existente**.
+Los respaldos JSON anteriores se pueden restaurar tras validar sus referencias y campos. La importación reemplaza el catálogo central y exige confirmación. La versión estática no transmite automáticamente sus datos a la API. El instalador completo del paquete sigue siendo inicial: **no ejecutar su --apply sobre una instalación existente**. El comando de actualización separado conserva los datos de instalaciones compatibles.
 
 ## Descargar y probar el instalador
 
@@ -39,7 +53,7 @@ Sustituye el dominio y las rutas. Las credenciales generadas quedan en `/etc/nex
 
 `dist/downloads/nexo-debian13.tar.gz` incluye el panel web, la API central, el agente y `install.sh` / `install.py`, con manifiesto de integridad y guía en español. Objetivo: VM dedicada Debian 13 amd64/arm64 con Python 3.13, systemd, Nginx, OpenSSL y un certificado válido ya provisionado. `--check` comprueba requisitos; `--install-deps` instala dependencias de Debian explícitamente; `--apply` instala y arranca Nexo. La guía completa está en `install/debian13/README.md` y dentro del paquete.
 
-La instalación genera credenciales privadas nuevas, protege el panel con HTTP Basic sobre HTTPS, mantiene la API y el agente en loopback con tokens separados y crea un virtual host propio. Rechaza rutas/cuentas Nexo existentes y no es un actualizador de instalaciones previas. Incluye reversión de sus propios archivos/cuenta/servicio ante fallos y no instala ni migra XUI. El origen mostrado en el diálogo de conexión se obtiene del sitio actual, para que también funcione autoalojado.
+La instalación genera credenciales privadas nuevas, protege el panel con HTTP Basic sobre HTTPS, mantiene la API y el agente en loopback con tokens separados y crea un virtual host propio. Rechaza rutas/cuentas Nexo existentes y su modo --apply no actualiza instalaciones previas. El actualizador separado está documentado en trial/README.md. Incluye reversión de sus propios archivos/cuenta/servicio ante fallos y no instala ni migra XUI. El origen mostrado en el diálogo de conexión se obtiene del sitio actual, para que también funcione autoalojado.
 
 El instalador y su reversión se prueban con destinos temporales y comandos simulados, además de hash real OpenSSL e integridad del archivo final. No se ha ejecutado la instalación completa en una VM Debian 13 real; este entorno es Ubuntu 24.04/Python 3.12. No instala el motor IPTV pendiente ni streaming FFmpeg; la base central guarda configuración del catálogo, sin autenticar reproductores.
 
