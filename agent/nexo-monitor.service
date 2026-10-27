@@ -1,0 +1,22 @@
+[Unit]
+Description=Nexo IPTV read-only Linux monitoring agent
+After=network.target
+
+[Service]
+Type=simple
+User=nexo-monitor
+Group=nexo-monitor
+EnvironmentFile=/etc/nexo-monitor.env
+ExecStart=/usr/bin/python3 /opt/nexo-monitor/nexo_monitor.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
